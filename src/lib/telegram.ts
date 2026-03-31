@@ -97,13 +97,13 @@ export async function sendOrderSummary(date: string): Promise<{
     msg2.push(`• <b>${productName}</b>: ${qtys} = <u>Total: ${total} ${data.unit}</u>`);
   });
 
-  msg2.push("");
-  msg2.push(`<b>🏪 OUTLET-WISE BREAKDOWN (for delivery):</b>`);
+  // msg2.push("");
+  // msg2.push(`<b>🏪 OUTLET-WISE BREAKDOWN (for delivery):</b>`);
 
-  productMap.forEach((data, productName) => {
-    const outletList = data.entries.map((e) => `${e.label}→${e.qty}`).join(", ");
-    msg2.push(`• <b>${productName}</b>: ${outletList} ${data.unit}`);
-  });
+  // productMap.forEach((data, productName) => {
+  //   const outletList = data.entries.map((e) => `${e.label}→${e.qty}`).join(", ");
+  //   msg2.push(`• <b>${productName}</b>: ${outletList} ${data.unit}`);
+  // });
 
   await sendTelegramMessage(msg2.join("\n"));
 
