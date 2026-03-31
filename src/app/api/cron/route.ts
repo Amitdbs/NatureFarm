@@ -12,20 +12,26 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Send summary for today (IST date)
-    // When cron fires at 23:30 UTC = 05:00 IST next day
-    // So we use the IST "today" which is UTC+5:30
+    // Convert current UTC time to IST (UTC+5:30) to get the correct date
     const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000; // 5h30m in ms
+    const istOffset = 5.5 * 60 * 60 * 1000;
     const istDate = new Date(now.getTime() + istOffset);
     const date = istDate.toISOString().split("T")[0];
 
     const result = await sendOrderSummary(date);
     console.log(`[CRON] Summary sent for ${date}:`, result);
 
-    return NextResponse.json({ success: true, date, ...result });
+    return NextResponse.json({
+      success: result.success,
+      date,
+      orderCount: result.orderCount,
+      message: result.message,
+    });
   } catch (err) {
     console.error("[CRON] Error sending summary:", err);
-    return NextResponse.json({ error: "Failed to send summary" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to send summary" },
+      { status: 500 }
+    );
   }
 }

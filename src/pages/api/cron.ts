@@ -20,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const result = await sendOrderSummary(date);
     console.log(`[CRON] Summary sent for ${date}:`, result);
 
-    return res.status(200).json({ success: true, date, ...result });
+    return res.status(200).json({ success: result.success, date, orderCount: result.orderCount, message: result.message });
   } catch (err) {
     console.error("[CRON] Error:", err);
     return res.status(500).json({ error: "Failed to send summary" });
