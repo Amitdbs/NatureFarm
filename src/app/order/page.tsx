@@ -22,6 +22,8 @@ interface OrderItem {
 
 type Step = "form" | "success";
 
+const STORAGE_KEY = "nf_remember";
+
 function today() {
   return new Date().toISOString().split("T")[0];
 }
@@ -29,22 +31,53 @@ function today() {
 export default function OrderPage() {
   const { t, locale } = useLanguage();
 
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts]           = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
-  const [filter, setFilter] = useState<"all" | "vegetable" | "fruit">("all");
+  const [filter, setFilter]               = useState<"all" | "vegetable" | "fruit">("all");
 
-  const [name, setName] = useState("");
-  const [contact, setContact] = useState("");
+  // ── Form fields ──────────────────────────────────────────────────
+  const [name, setName]           = useState("");
+  const [outletName, setOutletName] = useState("");
+  const [contact, setContact]     = useState("");
   const [orderDate, setOrderDate] = useState(today());
+  const [rememberMe, setRememberMe] = useState(false);
+
   const [items, setItems] = useState<OrderItem[]>([
     { productId: "", productName: "", quantity: "", unit: "" },
   ]);
 
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors]     = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [step, setStep] = useState<Step>("form");
-  const [orderId, setOrderId] = useState("");
+  const [step, setStep]         = useState<Step>("form");
+  const [orderId, setOrderId]   = useState("");
 
+  // ── Load remembered details on mount ─────────────────────────────
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const { name: n, outletName: o, contact: c } = JSON.parse(saved);
+        if (n) setName(n);
+        if (o) setOutletName(o);
+        if (c) setContact(c);
+        setRememberMe(true);
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, []);
+
+  // ── Save/clear remembered details when rememberMe changes ────────
+  useEffect(() => {
+    if (rememberMe && (name || outletName || contact)) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ name, outletName, contact }));
+    }
+    if (!rememberMe) {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [rememberMe, name, outletName, contact]);
+
+  // ── Products ──────────────────────────────────────────────────────
   useEffect(() => {
     fetch("/api/products")
       .then((r) => r.json())
@@ -52,16 +85,16 @@ export default function OrderPage() {
       .finally(() => setLoadingProducts(false));
   }, []);
 
-  const activeProducts = products.filter((p) => p.active);
-  const displayProducts =
-    filter === "all"
-      ? activeProducts
-      : activeProducts.filter((p) => p.category === filter);
+  const activeProducts  = products.filter((p) => p.active);
+  const displayProducts = filter === "all"
+    ? activeProducts
+    : activeProducts.filter((p) => p.category === filter);
 
   function getProductName(product: Product) {
     return locale === "hi" && product.nameHi ? product.nameHi : product.name;
   }
 
+  // ── Item helpers ──────────────────────────────────────────────────
   function addItem() {
     setItems([...items, { productId: "", productName: "", quantity: "", unit: "" }]);
   }
@@ -76,7 +109,7 @@ export default function OrderPage() {
     if (field === "productId") {
       const p = products.find((p) => p.id === value);
       updated[index].productName = p ? p.name : "";
-      updated[index].unit = p ? p.unit : "";
+      updated[index].unit        = p ? p.unit : "";
     }
     setItems(updated);
     const e = { ...errors };
@@ -85,12 +118,13 @@ export default function OrderPage() {
     setErrors(e);
   }
 
+  // ── Validation ────────────────────────────────────────────────────
   function validate(): boolean {
     const e: Record<string, string> = {};
-    if (!name.trim()) e.name = t("required_field");
+    if (!name.trim())    e.name    = t("required_field");
     if (!contact.trim()) e.contact = t("required_field");
     else if (!/^\d{10}$/.test(contact.trim())) e.contact = t("invalid_contact");
-    if (!orderDate) e.orderDate = t("required_field");
+    if (!orderDate)      e.orderDate = t("required_field");
     if (!items.some((i) => i.productId && i.quantity)) e.items = t("min_one_item");
     items.forEach((item, i) => {
       if (!item.productId) e[`item_${i}_product`] = t("required_field");
@@ -100,16 +134,23 @@ export default function OrderPage() {
     return Object.keys(e).length === 0;
   }
 
+  // ── Submit ────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
     try {
+      // If rememberMe is on, persist latest values
+      if (rememberMe) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ name: name.trim(), outletName: outletName.trim(), contact: contact.trim() }));
+      }
+
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customerName: name.trim(),
+          customerName:  name.trim(),
+          outletName:    outletName.trim(),
           contactNumber: contact.trim(),
           orderDate,
           items: items
@@ -129,12 +170,16 @@ export default function OrderPage() {
   }
 
   function resetForm() {
-    setName(""); setContact(""); setOrderDate(today());
+    // Keep remembered details if rememberMe is on
+    if (!rememberMe) { setName(""); setOutletName(""); setContact(""); }
+    setOrderDate(today());
     setItems([{ productId: "", productName: "", quantity: "", unit: "" }]);
-    setErrors({}); setOrderId(""); setStep("form");
+    setErrors({});
+    setOrderId("");
+    setStep("form");
   }
 
-  /* ── Success ─────────────────────────────────────────────────── */
+  // ── Success screen ────────────────────────────────────────────────
   if (step === "success") {
     return (
       <main className="min-h-screen bg-green-50 flex items-center justify-center p-4">
@@ -143,11 +188,11 @@ export default function OrderPage() {
             <div className="text-7xl mb-4">✅</div>
             <h2 className="text-2xl sm:text-3xl font-bold text-green-700 mb-2">{t("order_success_title")}</h2>
             <p className="text-gray-500 mb-5 text-sm sm:text-base">{t("order_success_msg")}</p>
-            <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 mb-6 inline-block mx-auto">
+            <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 mb-6 inline-block">
               <p className="text-xs text-gray-400 mb-0.5">{t("order_id")}</p>
               <p className="font-mono font-bold text-green-700">{orderId}</p>
             </div>
-            <div className="flex flex-col sm:flex-row gap-3 mt-2">
+            <div className="flex flex-col sm:flex-row gap-3">
               <button onClick={resetForm} className="btn-primary">🛒 {t("place_another")}</button>
               <Link href="/" className="btn-secondary">← {t("app_name")}</Link>
             </div>
@@ -157,7 +202,7 @@ export default function OrderPage() {
     );
   }
 
-  /* ── Form ─────────────────────────────────────────────────────── */
+  // ── Order form ────────────────────────────────────────────────────
   return (
     <main className="min-h-screen bg-green-50 pb-10">
 
@@ -168,17 +213,39 @@ export default function OrderPage() {
         <span className="text-2xl">🛒</span>
       </div>
 
-      {/* Content */}
       <div className="page-wrapper-wide pt-6 space-y-5">
         <form onSubmit={handleSubmit} noValidate>
 
-          {/* ── Customer Details ──────────────────────────────── */}
+          {/* ── Customer Details ─────────────────────────────── */}
           <div className="card-lg space-y-4">
-            <h2 className="section-title flex items-center gap-2">
-              <span>👤</span> Customer Details
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="section-title mb-0 flex items-center gap-2">
+                <span>👤</span> Customer Details
+              </h2>
 
-            {/* Name + Contact — side by side on md+ */}
+              {/* Remember Me toggle */}
+              <button
+                type="button"
+                onClick={() => setRememberMe(!rememberMe)}
+                className={`flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full border-2 transition-all duration-200 ${
+                  rememberMe
+                    ? "bg-green-600 border-green-600 text-white"
+                    : "bg-white border-gray-200 text-gray-500 hover:border-green-400 hover:text-green-600"
+                }`}
+              >
+                <span className="text-sm">{rememberMe ? "🔖" : "📌"}</span>
+                {t("remember_me")}
+              </button>
+            </div>
+
+            {rememberMe && (
+              <div className="flex items-start gap-2 bg-green-50 border border-green-100 rounded-xl px-3 py-2 text-xs text-green-700">
+                <span className="text-base flex-shrink-0">💾</span>
+                <span>Your name, outlet and contact will be saved on this device for next time.</span>
+              </div>
+            )}
+
+            {/* Name + Outlet — side by side on md+ */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="label">{t("name")} <span className="text-red-500">*</span></label>
@@ -193,6 +260,23 @@ export default function OrderPage() {
               </div>
 
               <div>
+                <label className="label">
+                  {t("outlet_name")}
+                  <span className="text-gray-400 text-xs font-normal ml-1">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  placeholder={t("outlet_placeholder")}
+                  value={outletName}
+                  onChange={(e) => setOutletName(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Contact — full width on mobile, half on md */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
                 <label className="label">{t("contact")} <span className="text-red-500">*</span></label>
                 <input
                   type="tel"
@@ -205,12 +289,9 @@ export default function OrderPage() {
                 />
                 {errors.contact && <p className="text-red-500 text-xs mt-1">{errors.contact}</p>}
               </div>
-            </div>
 
-            {/* Order Date — full width, fixed height */}
-            <div>
-              <label className="label">{t("order_date")} <span className="text-red-500">*</span></label>
-              <div className="relative">
+              <div>
+                <label className="label">{t("order_date")} <span className="text-red-500">*</span></label>
                 <input
                   type="date"
                   className="input-field"
@@ -219,12 +300,12 @@ export default function OrderPage() {
                   onChange={(e) => { setOrderDate(e.target.value); setErrors({ ...errors, orderDate: "" }); }}
                   style={{ colorScheme: "light" }}
                 />
+                {errors.orderDate && <p className="text-red-500 text-xs mt-1">{errors.orderDate}</p>}
               </div>
-              {errors.orderDate && <p className="text-red-500 text-xs mt-1">{errors.orderDate}</p>}
             </div>
           </div>
 
-          {/* ── Items ─────────────────────────────────────────── */}
+          {/* ── Items ────────────────────────────────────────── */}
           <div className="card-lg">
             <h2 className="section-title flex items-center gap-2 mb-4">
               <span>🥬</span> {t("items")}
@@ -257,14 +338,9 @@ export default function OrderPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {/* Items grid — 1 col mobile, 2 col on lg+ */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                   {items.map((item, index) => (
-                    <div
-                      key={index}
-                      className="bg-green-50 border border-green-100 rounded-xl p-3 space-y-2.5"
-                    >
-                      {/* Item header */}
+                    <div key={index} className="bg-green-50 border border-green-100 rounded-xl p-3 space-y-2.5">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
                           Item {index + 1}
@@ -280,7 +356,6 @@ export default function OrderPage() {
                         )}
                       </div>
 
-                      {/* Product select */}
                       <div>
                         <select
                           className="input-field text-sm"
@@ -299,7 +374,6 @@ export default function OrderPage() {
                         )}
                       </div>
 
-                      {/* Quantity + Unit */}
                       <div className="flex gap-2">
                         <div className="flex-1">
                           <input
@@ -326,11 +400,10 @@ export default function OrderPage() {
                   ))}
                 </div>
 
-                {/* Add item button */}
                 <button
                   type="button"
                   onClick={addItem}
-                  className="w-full border-2 border-dashed border-green-300 text-green-600 font-medium py-3 rounded-xl hover:bg-green-50 active:scale-95 transition-all duration-150 text-sm"
+                  className="w-full border-2 border-dashed border-green-300 text-green-600 font-medium py-3 rounded-xl hover:bg-green-50 active:scale-95 transition-all text-sm"
                 >
                   {t("add_item")}
                 </button>
@@ -351,7 +424,10 @@ export default function OrderPage() {
             disabled={submitting || loadingProducts}
             className="btn-primary text-base sm:text-lg py-4"
           >
-            {submitting ? <><span className="animate-spin inline-block">🌀</span> {t("submitting")}</> : <>✅ {t("submit_order")}</>}
+            {submitting
+              ? <><span className="animate-spin inline-block">🌀</span> {t("submitting")}</>
+              : <>✅ {t("submit_order")}</>
+            }
           </button>
 
         </form>

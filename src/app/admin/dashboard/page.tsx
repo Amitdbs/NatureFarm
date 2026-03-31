@@ -18,6 +18,7 @@ interface OrderItem { productName: string; quantity: number; unit: string; }
 interface Order {
   orderId: string;
   customerName: string;
+  outletName: string;
   contactNumber: string;
   orderDate: string;
   submittedAt: string;
@@ -391,11 +392,16 @@ export default function AdminDashboard() {
                   {orders.map((order, idx) => (
                     <div key={order.orderId} className="card hover:shadow-md transition-shadow">
                       <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <p className="font-bold text-gray-800">{idx + 1}. {order.customerName}</p>
+                        <div className="flex-1 min-w-0">
+                          {order.outletName && (
+                            <p className="font-bold text-green-700 truncate">🏪 {order.outletName}</p>
+                          )}
+                          <p className={`font-semibold text-gray-800 truncate ${order.outletName ? "text-sm" : ""}`}>
+                            {idx + 1}. {order.customerName}
+                          </p>
                           <p className="text-sm text-gray-500 mt-0.5">📞 {order.contactNumber}</p>
                         </div>
-                        <span className="text-xs text-gray-300 font-mono bg-gray-50 px-2 py-0.5 rounded">#{order.orderId.slice(-6)}</span>
+                        <span className="text-xs text-gray-300 font-mono bg-gray-50 px-2 py-0.5 rounded ml-2 flex-shrink-0">#{order.orderId.slice(-6)}</span>
                       </div>
                       <div className="border-t border-gray-50 pt-2 space-y-1.5">
                         {order.items.map((item, i) => (

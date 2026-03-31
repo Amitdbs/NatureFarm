@@ -21,6 +21,7 @@ export interface OrderItem {
 export interface Order {
   orderId: string;
   customerName: string;
+  outletName: string;
   contactNumber: string;
   orderDate: string;
   submittedAt: string;
@@ -75,7 +76,7 @@ export async function initializeSheets(): Promise<void> {
 
   // Add headers if sheets are new
   const ordersHeader = [
-    ["OrderID", "CustomerName", "ContactNumber", "OrderDate", "SubmittedAt"],
+    ["OrderID", "CustomerName", "OutletName", "ContactNumber", "OrderDate", "SubmittedAt"],
   ];
   const itemsHeader = [["OrderID", "ProductName", "Quantity", "Unit"]];
   const productsHeader = [
@@ -238,6 +239,7 @@ export async function saveOrder(order: Omit<Order, "orderId">): Promise<string> 
         [
           orderId,
           order.customerName,
+          order.outletName || "",
           order.contactNumber,
           order.orderDate,
           now,
@@ -269,7 +271,7 @@ export async function getOrdersForDate(date: string): Promise<Order[]> {
   const [ordersRes, itemsRes] = await Promise.all([
     sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
-      range: "Orders!A2:E",
+      range: "Orders!A2:F",   // A=OrderID B=CustomerName C=OutletName D=Contact E=OrderDate F=SubmittedAt
     }),
     sheets.spreadsheets.values.get({
       spreadsheetId: SPREADSHEET_ID,
@@ -278,16 +280,17 @@ export async function getOrdersForDate(date: string): Promise<Order[]> {
   ]);
 
   const orderRows = (ordersRes.data.values || []).filter(
-    (r) => r[3] === date
+    (r) => r[4] === date    // OrderDate is now column E (index 4)
   );
   const itemRows = itemsRes.data.values || [];
 
   return orderRows.map((r) => ({
     orderId: r[0],
     customerName: r[1],
-    contactNumber: r[2],
-    orderDate: r[3],
-    submittedAt: r[4],
+    outletName: r[2] || "",
+    contactNumber: r[3],
+    orderDate: r[4],
+    submittedAt: r[5],
     items: itemRows
       .filter((item) => item[0] === r[0])
       .map((item) => ({

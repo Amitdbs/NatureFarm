@@ -28,13 +28,12 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { customerName, contactNumber, orderDate, items } = body;
+    const { customerName, outletName, contactNumber, orderDate, items } = body;
 
     if (!customerName || !contactNumber || !orderDate || !items?.length) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Validate items
     for (const item of items) {
       if (!item.productName || !item.quantity || item.quantity <= 0) {
         return NextResponse.json({ error: "Invalid item data" }, { status: 400 });
@@ -45,6 +44,7 @@ export async function POST(req: NextRequest) {
 
     const orderId = await saveOrder({
       customerName,
+      outletName: outletName || "",
       contactNumber,
       orderDate,
       submittedAt: new Date().toISOString(),
