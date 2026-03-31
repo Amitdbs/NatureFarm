@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\\\Users\\\\User\\\\Desktop\\\\NatureFarm2.0\")",
+      "Bash(del \"C:\\\\Users\\\\User\\\\Desktop\\\\NatureFarm2.0\\\\next.config.ts\")"
+    ]
+  }
+}
