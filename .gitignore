@@ -25,6 +25,12 @@ yarn-error.log*
 # Vercel
 .vercel
 
+# Netlify
+.netlify/
+
+# Claude / AI editor settings
+.claude/
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
