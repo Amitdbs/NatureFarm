@@ -134,7 +134,8 @@ export async function initializeSheets(): Promise<void> {
     range: "Config!A2:B",
   });
   if (!cfgRes.data.values || cfgRes.data.values.length === 0) {
-    const defaultPwd = process.env.ADMIN_PASSWORD || "admin123";
+    const defaultPwd = process.env.ADMIN_PASSWORD;
+    if (!defaultPwd) throw new Error("ADMIN_PASSWORD env var is not set");
     const hash = await hashPassword(defaultPwd);
     await sheets.spreadsheets.values.append({
       spreadsheetId: SPREADSHEET_ID,
